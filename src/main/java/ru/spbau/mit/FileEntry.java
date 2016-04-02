@@ -7,7 +7,7 @@ import java.io.IOException;
 /**
  * Created by ldvsoft on 22.03.16.
  */
-public final class FileEntry implements Comparable<FileEntry> {
+public final class FileEntry {
     public static FileEntry readFrom(DataInputStream dis, boolean hasId) throws IOException {
         if (hasId) {
             return new FileEntry(
@@ -68,10 +68,5 @@ public final class FileEntry implements Comparable<FileEntry> {
         }
         dos.writeUTF(name);
         dos.writeLong(size);
-    }
-
-    @Override
-    public int compareTo(FileEntry that) {
-        return Integer.compare(this.id, that.id);
     }
 }

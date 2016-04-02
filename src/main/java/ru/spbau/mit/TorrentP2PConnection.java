@@ -4,7 +4,6 @@ import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.List;
 
 /**
  * Created by ldvsoft on 22.03.16.
@@ -13,7 +12,7 @@ public class TorrentP2PConnection extends Connection {
     public static final int ACTION_STAT = 1;
     public static final int ACTION_GET = 2;
 
-    public static final long PART_SIZE = 10 * 1024 * 1024 *  1024l;
+    public static final int PART_SIZE = 10 * 1024 * 1024;
 
     public TorrentP2PConnection(Socket socket) throws IOException {
         super(socket);
@@ -22,40 +21,46 @@ public class TorrentP2PConnection extends Connection {
     // STAT
 
     public void writeStatAction(int fileId) throws IOException {
+        DataOutputStream dos = getOutput();
         dos.writeByte(ACTION_STAT);
         dos.writeInt(fileId);
         dos.flush();
     }
 
     public int readStatAction() throws IOException {
-        return dis.readInt();
+        return getInput().readInt();
     }
 
-    public void writeStatResponse(List<Integer> parts) throws IOException {
-        writeList(parts, DataOutputStream::writeInt, dos);
+    public void writeStatResponse(int size, BitSet parts) throws IOException {
+        DataOutputStream dos = getOutput();
+        parts.writeTo(dos);
+        dos.flush();
     }
 
-    public List<Integer> readStatResponse() throws IOException {
-        return readList(DataInputStream::readInt, dis);
+    public BitSet readStatResponse(int size) throws IOException {
+        return BitSet.readFrom(getInput(), size);
     }
 
     // GET
 
     public void writeGetAction(GetRequest request) throws IOException {
+        DataOutputStream dos = getOutput();
         dos.writeByte(ACTION_GET);
         request.writeTo(dos);
         dos.flush();
     }
 
     public GetRequest readGetAction() throws IOException {
-        return GetRequest.readFrom(dis);
+        return GetRequest.readFrom(getInput());
     }
 
     public void writeGetResponse(InputStream from) throws IOException {
-        IOUtils.copyLarge(from, dos, 0l, PART_SIZE);
+        DataOutputStream dos = getOutput();
+        IOUtils.copyLarge(from, dos, 0L, PART_SIZE);
+        dos.flush();
     }
 
     public void readGetResponse(OutputStream to) throws IOException {
-        IOUtils.copyLarge(dis, to, 0l, PART_SIZE);
+        IOUtils.copyLarge(getInput(), to, 0L, PART_SIZE);
     }
 }

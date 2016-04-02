@@ -3,6 +3,8 @@ package ru.spbau.mit;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -11,21 +13,21 @@ import java.util.List;
 public class ClientInfo {
     public static ClientInfo readFrom(DataInputStream dis) throws IOException {
         return new ClientInfo(
-                dis.readUnsignedShort(),
-                Connection.readList(DataInputStream::readInt, dis)
+                IOUtils.readAddress(dis),
+                IOUtils.readCollection(new ArrayList<>(), DataInputStream::readInt, dis)
         );
     }
 
-    private int port;
+    private InetSocketAddress socketAddress;
     private List<Integer> ids;
 
-    public ClientInfo(int port, List<Integer> ids) {
-        this.port = port;
+    public ClientInfo(InetSocketAddress socketAddress, List<Integer> ids) {
+        this.socketAddress = socketAddress;
         this.ids = ids;
     }
 
-    public int getPort() {
-        return port;
+    public InetSocketAddress getSocketAddress() {
+        return socketAddress;
     }
 
     public List<Integer> getIds() {
@@ -33,7 +35,8 @@ public class ClientInfo {
     }
 
     public void writeTo(DataOutputStream dos) throws IOException {
-        dos.writeShort(port);
-        Connection.writeList(ids, DataOutputStream::writeInt, dos);
+        IOUtils.writeAddress(dos, socketAddress);
+        IOUtils.writeCollection(ids, DataOutputStream::writeInt, dos);
     }
+
 }
