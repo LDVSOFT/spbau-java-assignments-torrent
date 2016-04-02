@@ -15,36 +15,6 @@ public class TorrentP2PConnection extends Connection {
 
     public static final long PART_SIZE = 10 * 1024 * 1024 *  1024l;
 
-    public static class GetRequest {
-        public static GetRequest readFrom(DataInputStream dis) throws IOException {
-            return new GetRequest(
-                    dis.readInt(),
-                    dis.readInt()
-            );
-        }
-
-        private int fileId;
-        private int partId;
-
-        public GetRequest(int fileId, int partId) {
-            this.fileId = fileId;
-            this.partId = partId;
-        }
-
-        public int getFileId() {
-            return fileId;
-        }
-
-        public int getPartId() {
-            return partId;
-        }
-
-        public void writeTo(DataOutputStream dos) throws IOException {
-            dos.writeInt(fileId);
-            dos.writeInt(partId);
-        }
-    }
-
     public TorrentP2PConnection(Socket socket) throws IOException {
         super(socket);
     }
