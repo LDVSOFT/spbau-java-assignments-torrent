@@ -50,6 +50,16 @@ public abstract class TorrentClientMain {
                     int newFileId = client.newFile(pathString);
                     System.out.printf("New file uploaded, id is %d.\n", newFileId);
                     break;
+                case "run":
+                    client.run();
+                    while (true) {
+                        try {
+                            Thread.sleep(TorrentTrackerConnection.DELAY);
+                        } catch (InterruptedException e) {
+                            break;
+                        }
+                    }
+                    break;
                 default:
                     System.err.printf("Unknown action \"%s\".\n", action);
                     break;
@@ -64,6 +74,7 @@ public abstract class TorrentClientMain {
         System.err.printf("\tlist <tracker-address>: get available files list from the tracker.\n");
         System.err.printf("\tget <tracker-address> <id>: mark file with given id for download.\n");
         System.err.printf("\tnewfile <tracker-address> <path>: upload new file to tracker.\n");
+        System.err.printf("\trun <tracker-address>: start working until interrupted.\n");
 
         System.exit(1);
     }

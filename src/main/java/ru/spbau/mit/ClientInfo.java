@@ -11,13 +11,6 @@ import java.util.List;
  * Created by ldvsoft on 22.03.16.
  */
 public class ClientInfo {
-    public static ClientInfo readFrom(DataInputStream dis) throws IOException {
-        return new ClientInfo(
-                IOUtils.readAddress(dis),
-                IOUtils.readCollection(new ArrayList<>(), DataInputStream::readInt, dis)
-        );
-    }
-
     private InetSocketAddress socketAddress;
     private List<Integer> ids;
 
@@ -39,4 +32,10 @@ public class ClientInfo {
         IOUtils.writeCollection(ids, DataOutputStream::writeInt, dos);
     }
 
+    public static ClientInfo readFrom(DataInputStream dis) throws IOException {
+        return new ClientInfo(
+                IOUtils.readAddress(dis),
+                IOUtils.readCollection(new ArrayList<>(), DataInputStream::readInt, dis)
+        );
+    }
 }

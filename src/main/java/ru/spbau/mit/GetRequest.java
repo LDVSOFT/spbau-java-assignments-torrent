@@ -8,13 +8,6 @@ import java.io.IOException;
  * Created by ldvsoft on 22.03.16.
  */
 public class GetRequest {
-    public static GetRequest readFrom(DataInputStream dis) throws IOException {
-        return new GetRequest(
-                dis.readInt(),
-                dis.readInt()
-        );
-    }
-
     private int fileId;
     private int partId;
 
@@ -34,5 +27,12 @@ public class GetRequest {
     public void writeTo(DataOutputStream dos) throws IOException {
         dos.writeInt(fileId);
         dos.writeInt(partId);
+    }
+
+    public static GetRequest readFrom(DataInputStream dis) throws IOException {
+        return new GetRequest(
+                dis.readInt(),
+                dis.readInt()
+        );
     }
 }

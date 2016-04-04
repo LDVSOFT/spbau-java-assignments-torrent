@@ -8,21 +8,6 @@ import java.io.IOException;
  * Created by ldvsoft on 22.03.16.
  */
 public final class FileEntry {
-    public static FileEntry readFrom(DataInputStream dis, boolean hasId) throws IOException {
-        if (hasId) {
-            return new FileEntry(
-                    dis.readInt(),
-                    dis.readUTF(),
-                    dis.readLong()
-            );
-        } else {
-            return new FileEntry(
-                    dis.readUTF(),
-                    dis.readLong()
-            );
-        }
-    }
-
     private boolean hasId;
     private int id;
     private String name;
@@ -68,5 +53,20 @@ public final class FileEntry {
         }
         dos.writeUTF(name);
         dos.writeLong(size);
+    }
+
+    public static FileEntry readFrom(DataInputStream dis, boolean hasId) throws IOException {
+        if (hasId) {
+            return new FileEntry(
+                    dis.readInt(),
+                    dis.readUTF(),
+                    dis.readLong()
+            );
+        } else {
+            return new FileEntry(
+                    dis.readUTF(),
+                    dis.readLong()
+            );
+        }
     }
 }

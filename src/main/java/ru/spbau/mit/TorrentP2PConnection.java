@@ -9,8 +9,8 @@ import java.net.Socket;
  * Created by ldvsoft on 22.03.16.
  */
 public class TorrentP2PConnection extends Connection {
-    public static final int ACTION_STAT = 1;
-    public static final int ACTION_GET = 2;
+    public static final int REQUEST_STAT = 1;
+    public static final int REQUEST_GET = 2;
 
     public static final int PART_SIZE = 10 * 1024 * 1024;
 
@@ -20,37 +20,37 @@ public class TorrentP2PConnection extends Connection {
 
     // STAT
 
-    public void writeStatAction(int fileId) throws IOException {
+    public void writeStatRequest(int fileId) throws IOException {
         DataOutputStream dos = getOutput();
-        dos.writeByte(ACTION_STAT);
+        dos.writeByte(REQUEST_STAT);
         dos.writeInt(fileId);
         dos.flush();
     }
 
-    public int readStatAction() throws IOException {
+    public int readStatRequest() throws IOException {
         return getInput().readInt();
     }
 
-    public void writeStatResponse(int size, BitSet parts) throws IOException {
+    public void writeStatResponse(PartsSet parts) throws IOException {
         DataOutputStream dos = getOutput();
         parts.writeTo(dos);
         dos.flush();
     }
 
-    public BitSet readStatResponse(int size) throws IOException {
-        return BitSet.readFrom(getInput(), size);
+    public PartsSet readStatResponse(int size) throws IOException {
+        return PartsSet.readFrom(getInput(), size);
     }
 
     // GET
 
-    public void writeGetAction(GetRequest request) throws IOException {
+    public void writeGetRequest(GetRequest request) throws IOException {
         DataOutputStream dos = getOutput();
-        dos.writeByte(ACTION_GET);
+        dos.writeByte(REQUEST_GET);
         request.writeTo(dos);
         dos.flush();
     }
 
-    public GetRequest readGetAction() throws IOException {
+    public GetRequest readGetRequest() throws IOException {
         return GetRequest.readFrom(getInput());
     }
 
