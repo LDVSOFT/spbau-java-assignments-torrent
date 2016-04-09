@@ -2,7 +2,6 @@ package ru.spbau.mit;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -44,10 +43,11 @@ public abstract class IOUtils {
 
     public static InetSocketAddress readAddress(DataInputStream dis) throws IOException {
         byte[] buffer = new byte[IP4_LENGTH];
-        if (dis.read(buffer, 0, IP4_LENGTH) != IP4_LENGTH) {
-            throw new EOFException("Cannot read address");
+        // I hate that read() call :(
+        for (int i = 0; i != IP4_LENGTH; i++) {
+            buffer[i] = dis.readByte();
         }
-        int port = dis.readShort();
+        int port = dis.readUnsignedShort();
         return new InetSocketAddress(InetAddress.getByAddress(buffer), port);
     }
 

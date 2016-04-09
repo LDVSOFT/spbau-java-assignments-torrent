@@ -3,6 +3,7 @@ package ru.spbau.mit;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Collection;
 
@@ -28,6 +29,10 @@ public abstract class Connection implements AutoCloseable {
     public DataOutputStream getOutput() {
         return dos;
     }
+
+    public String getHost() {
+        return ((InetSocketAddress) socket.getRemoteSocketAddress()).getHostString();
+    };
 
     @Override
     public void close() {

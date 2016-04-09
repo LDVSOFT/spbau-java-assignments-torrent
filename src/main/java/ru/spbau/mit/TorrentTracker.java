@@ -12,6 +12,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -19,26 +21,35 @@ import java.util.stream.Collectors;
 /**
  * Created by ldvsoft on 02.04.16.
  */
-public class TorrentTracker {
-    private static final Path STATE_PATH = Paths.get("tracker-state.dat");
+public class TorrentTracker implements AutoCloseable {
+    private static final String STATE_FILE = "tracker-state.dat";
 
-    private volatile ExecutorService executorService;
-    private volatile ServerSocket serverSocket;
-    private volatile List<FileEntry> files;
+    private String workingDir;
+    private ExecutorService threadPool;
+    private ScheduledExecutorService scheduler;
+    private ServerSocket serverSocket;
+    private List<FileEntry> files;
+    private Map<Integer, Set<ClientInfo>> seeders;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private volatile Map<Integer, Set<ClientInfo>> seeders;
 
-    public TorrentTracker() throws IOException {
-        serverSocket = new ServerSocket(TorrentTrackerConnection.TRACKER_PORT);
-        executorService = Executors.newCachedThreadPool();
-        files = new ArrayList<>();
-        load();
-        executorService.submit(this::work);
+    public TorrentTracker(String workingDir) throws IOException {
+        try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
+            this.workingDir = workingDir;
+            serverSocket = new ServerSocket(TorrentTrackerConnection.TRACKER_PORT);
+            threadPool = Executors.newCachedThreadPool();
+            scheduler = Executors.newScheduledThreadPool(1);
+            load();
+        }
+        threadPool.submit(this::work);
     }
 
+    @Override
     public void close() throws IOException {
-        serverSocket.close();
-        executorService.shutdown();
+        try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
+            serverSocket.close();
+        }
+        threadPool.shutdown();
+        scheduler.shutdown();
         store();
     }
 
@@ -49,7 +60,7 @@ public class TorrentTracker {
                 if (socket == null) {
                     return;
                 }
-                executorService.submit(() -> handleConnection(socket));
+                threadPool.submit(() -> handleConnection(socket));
             } catch (IOException e) {
                 e.printStackTrace();
                 break;
@@ -71,61 +82,90 @@ public class TorrentTracker {
                     doUpload(connection);
                     break;
                 case TorrentTrackerConnection.REQUEST_UPDATE:
+                    doUpdate(connection);
                     break;
                 default:
                     System.err.printf("Wrong request from client: %d.\n", request);
                     break;
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     private void doList(TorrentTrackerConnection connection) throws IOException {
-        lock.readLock().lock();
-        try {
+        try (LockHandler handler = LockHandler.lock(lock.readLock())) {
             connection.writeListResponse(files);
-        } finally {
-            lock.readLock().unlock();
         }
     }
 
     private void doSources(TorrentTrackerConnection connection) throws IOException {
-        lock.readLock().lock();
-        try {
-            List<InetSocketAddress> result = connection.readSourcesRequest().stream()
-                    .flatMap(i -> seeders.get(i).stream())
+        List<Integer> request = connection.readSourcesRequest();
+        List<InetSocketAddress> result;
+        try (LockHandler handler = LockHandler.lock(lock.readLock())) {
+            result = request.stream()
+                    .flatMap(i -> seeders
+                            .getOrDefault(i, Collections.emptySet())
+                            .stream()
+                    )
                     .distinct()
                     .map(ClientInfo::getSocketAddress)
                     .collect(Collectors.toList());
-            connection.writeSourcesResponse(result);
-        } finally {
-            lock.readLock().unlock();
         }
+        connection.writeSourcesResponse(result);
     }
 
     private void doUpload(TorrentTrackerConnection connection) throws IOException {
-        lock.writeLock().lock();
-        try {
-            FileEntry newEntry = connection.readUploadRequest();
+        FileEntry newEntry = connection.readUploadRequest();
+        try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
             int newId = files.size();
             newEntry.setId(newId);
             files.add(newEntry);
-            connection.writeUploadResponse(newId);
-        } finally {
-            lock.writeLock().unlock();
         }
+        connection.writeUploadResponse(newEntry.getId());
+    }
+
+    private void doUpdate(TorrentTrackerConnection connection) throws IOException {
+        ClientInfo receivedClientInfo = connection.readUpdateRequest();
+        ClientInfo clientInfo = new ClientInfo(
+                new InetSocketAddress(connection.getHost(), receivedClientInfo.getSocketAddress().getPort()),
+                receivedClientInfo.getIds()
+        );
+        try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
+            for (int id : clientInfo.getIds()) {
+                if (seeders.get(id) == null) {
+                    seeders.put(id, new HashSet<>());
+                }
+                seeders.get(id).add(clientInfo);
+            }
+        }
+
+        scheduler.schedule(() -> {
+            try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
+                for (int id : clientInfo.getIds()) {
+                    seeders.get(id).remove(clientInfo);
+                }
+            }
+        }, TorrentTrackerConnection.UPDATE_DELAY, TimeUnit.MILLISECONDS);
+
+        connection.writeUpdateResponse(true);
     }
 
     private void store() throws IOException {
-        try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(STATE_PATH))) {
+        Path path = Paths.get(workingDir, STATE_FILE);
+        if (!Files.exists(path)) {
+            Files.createDirectories(Paths.get(workingDir));
+            Files.createFile(path);
+        }
+        try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(path))) {
             IOUtils.writeCollection(files, (dos1, o) -> o.writeTo(dos1), dos);
         }
     }
 
     private void load() throws IOException {
-        if (Files.exists(STATE_PATH)) {
-            try (DataInputStream dis = new DataInputStream(Files.newInputStream(STATE_PATH))) {
+        Path path = Paths.get(workingDir, STATE_FILE);
+        if (Files.exists(path)) {
+            try (DataInputStream dis = new DataInputStream(Files.newInputStream(path))) {
                 files = IOUtils.readCollection(new ArrayList<>(), dis1 -> FileEntry.readFrom(dis1, true), dis);
             }
         } else {

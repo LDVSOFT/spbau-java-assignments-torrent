@@ -14,7 +14,7 @@ import java.util.List;
  */
 public class TorrentTrackerConnection extends Connection {
     public static final int TRACKER_PORT = 8081;
-    public static final int DELAY = 60 * 1000;
+    public static final int UPDATE_DELAY = 60 * 1000;
 
     public static final int REQUEST_LIST = 1;
     public static final int REQUEST_UPLOAD = 2;
