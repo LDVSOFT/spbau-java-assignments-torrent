@@ -1,6 +1,7 @@
 package ru.spbau.mit;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 
 /**
  * Created by ldvsoft on 04.04.16.
@@ -8,7 +9,7 @@ import java.io.IOException;
 public abstract class TorrentTrackerMain {
     public static void main(String[] args) {
         try {
-            TorrentTracker tracker = new TorrentTracker(".");
+            TorrentTracker tracker = new TorrentTracker(Paths.get(""));
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {

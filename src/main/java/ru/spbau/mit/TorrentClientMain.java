@@ -1,6 +1,8 @@
 package ru.spbau.mit;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Created by ldvsoft on 02.04.16.
@@ -90,7 +92,7 @@ public abstract class TorrentClientMain {
             helpAndHalt();
         }
         String trackerAddress = args[ARG_ADDRESS];
-        try (TorrentClient client = new TorrentClient(trackerAddress, ".")) {
+        try (TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""))) {
             client.list().forEach(entry -> System.out.printf(
                     "%d: %s (%d bytes).\n",
                     entry.getId(),
@@ -107,7 +109,7 @@ public abstract class TorrentClientMain {
         }
         String trackerAddress = args[ARG_ADDRESS];
         int id = Integer.decode(args[ARG_1]);
-        try (TorrentClient client = new TorrentClient(trackerAddress, ".")) {
+        try (TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""))) {
             if (client.get(id)) {
                 System.out.printf("New file added to download.\n");
             } else {
@@ -122,10 +124,10 @@ public abstract class TorrentClientMain {
             helpAndHalt();
         }
         String trackerAddress = args[ARG_ADDRESS];
-        String pathString = args[ARG_1];
-        try (TorrentClient client = new TorrentClient(trackerAddress, ".")) {
+        Path path = Paths.get(args[ARG_1]);
+        try (TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""))) {
             client.setCallbacks(STATUS_CALLBACKS);
-            int newFileId = client.newFile(pathString).getId();
+            int newFileId = client.newFile(path).getId();
             System.out.printf("New file uploaded, id is %d.\n", newFileId);
         }
     }
@@ -137,7 +139,7 @@ public abstract class TorrentClientMain {
         }
         String trackerAddress = args[ARG_ADDRESS];
         try {
-            TorrentClient client = new TorrentClient(trackerAddress, ".");
+            TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""));
             client.setCallbacks(STATUS_CALLBACKS);
             client.run();
 

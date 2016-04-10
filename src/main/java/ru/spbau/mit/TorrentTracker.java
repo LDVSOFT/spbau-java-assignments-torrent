@@ -8,7 +8,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,7 +23,7 @@ import java.util.stream.Collectors;
 public class TorrentTracker implements AutoCloseable {
     private static final String STATE_FILE = "tracker-state.dat";
 
-    private String workingDir;
+    private Path workingDir;
     private ExecutorService threadPool;
     private ScheduledExecutorService scheduler;
     private ServerSocket serverSocket;
@@ -32,7 +31,7 @@ public class TorrentTracker implements AutoCloseable {
     private Map<Integer, Set<ClientInfo>> seeders;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-    public TorrentTracker(String workingDir) throws IOException {
+    public TorrentTracker(Path workingDir) throws IOException {
         try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
             this.workingDir = workingDir;
             serverSocket = new ServerSocket(TorrentTrackerConnection.TRACKER_PORT);
@@ -152,9 +151,9 @@ public class TorrentTracker implements AutoCloseable {
     }
 
     private void store() throws IOException {
-        Path path = Paths.get(workingDir, STATE_FILE);
+        Path path = workingDir.resolve(STATE_FILE);
         if (!Files.exists(path)) {
-            Files.createDirectories(Paths.get(workingDir));
+            Files.createDirectories(workingDir);
             Files.createFile(path);
         }
         try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(path))) {
@@ -163,7 +162,7 @@ public class TorrentTracker implements AutoCloseable {
     }
 
     private void load() throws IOException {
-        Path path = Paths.get(workingDir, STATE_FILE);
+        Path path = workingDir.resolve(STATE_FILE);
         if (Files.exists(path)) {
             try (DataInputStream dis = new DataInputStream(Files.newInputStream(path))) {
                 files = IOUtils.readCollection(new ArrayList<>(), dis1 -> FileEntry.readFrom(dis1, true), dis);

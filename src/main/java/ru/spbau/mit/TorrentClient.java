@@ -33,29 +33,28 @@ public class TorrentClient implements AutoCloseable {
         private ReadWriteLock fileLock = new ReentrantReadWriteLock();
         private FileEntry entry;
         private PartsSet parts;
-        private String localPath;
+        private Path localPath;
 
-        private FileState(FileEntry entry, String localPath, String workingDir) throws IOException {
+        private FileState(FileEntry entry, Path localPath, Path workingDir) throws IOException {
             this(entry, new PartsSet(entry.getPartsCount(), localPath != null), localPath, workingDir);
         }
 
         private FileState(
                 FileEntry entry,
                 PartsSet parts,
-                String localPath,
-                String workingDir
+                Path localPath,
+                Path workingDir
         ) throws IOException {
             this.entry = entry;
             this.parts = parts;
             if (localPath == null) {
-                this.localPath = Paths.get(
-                        workingDir,
+                this.localPath = workingDir.resolve(Paths.get(
                         DOWNLOADS_DIR,
                         Integer.toString(entry.getId()),
                         entry.getName()
-                ).toString();
-                Files.createDirectories(Paths.get(this.localPath).getParent());
-                try (RandomAccessFile file = new RandomAccessFile(this.localPath, "rw")) {
+                ));
+                Files.createDirectories(this.localPath.getParent());
+                try (RandomAccessFile file = new RandomAccessFile(this.localPath.toString(), "rw")) {
                     file.setLength(entry.getSize());
                 }
             } else {
@@ -66,14 +65,14 @@ public class TorrentClient implements AutoCloseable {
         private void writeTo(DataOutputStream dos) throws IOException {
             entry.writeTo(dos);
             parts.writeTo(dos);
-            dos.writeUTF(localPath);
+            dos.writeUTF(localPath.toString());
         }
 
         private static FileState readFrom(DataInputStream dis) throws IOException {
             FileEntry fileEntry = FileEntry.readFrom(dis, true);
             PartsSet parts = PartsSet.readFrom(dis, fileEntry.getPartsCount());
             String localPath = dis.readUTF();
-            return new FileState(fileEntry, parts, localPath, null);
+            return new FileState(fileEntry, parts, Paths.get(localPath), null);
         }
     }
 
@@ -86,7 +85,7 @@ public class TorrentClient implements AutoCloseable {
         void onP2PServerIssue(Throwable e);
     }
 
-    private String workingDir;
+    private Path workingDir;
     private ReadWriteLock lock = new ReentrantReadWriteLock();
     private Map<Integer, FileState> files;
     private String host;
@@ -98,7 +97,7 @@ public class TorrentClient implements AutoCloseable {
     private ExecutorService threadPool;
     private ScheduledExecutorService scheduler;
 
-    public TorrentClient(String host, String workingDir) throws IOException {
+    public TorrentClient(String host, Path workingDir) throws IOException {
         this.host = host;
         this.workingDir = workingDir;
         load();
@@ -148,8 +147,7 @@ public class TorrentClient implements AutoCloseable {
         return true;
     }
 
-    public FileEntry newFile(String pathString) throws IOException {
-        Path path = Paths.get(pathString);
+    public FileEntry newFile(Path path) throws IOException {
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("File not exists or is not a regular file.");
         }
@@ -160,7 +158,7 @@ public class TorrentClient implements AutoCloseable {
             int newId = connection.readUploadResponse();
             newEntry.setId(newId);
         }
-        FileState newState = new FileState(newEntry, pathString, null);
+        FileState newState = new FileState(newEntry, path, null);
         try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
             files.put(newEntry.getId(), newState);
         }
@@ -215,7 +213,7 @@ public class TorrentClient implements AutoCloseable {
     private void get(InetSocketAddress seeder, FileState state, int partId) throws IOException {
         try (TorrentP2PConnection connection = connectToSeeder(seeder)) {
             connection.writeGetRequest(new GetRequest(state.entry.getId(), partId));
-            try (RandomAccessFile file = new RandomAccessFile(state.localPath, "rw")) {
+            try (RandomAccessFile file = new RandomAccessFile(state.localPath.toString(), "rw")) {
                 connection.readGetResponse(file, partId, state.entry);
             }
         }
@@ -272,7 +270,6 @@ public class TorrentClient implements AutoCloseable {
                     );
             }
         } catch (Exception e) {
-            e.printStackTrace();
             notifyP2PServerIssue(e);
         }
     }
@@ -300,7 +297,7 @@ public class TorrentClient implements AutoCloseable {
             }
         }
         // We already checked that file has requested part, just read it without locking
-        try (RandomAccessFile file = new RandomAccessFile(state.localPath, "r")) {
+        try (RandomAccessFile file = new RandomAccessFile(state.localPath.toString(), "r")) {
             connection.writeGetResponse(file, request.getPartId(), state.entry);
         }
     }
@@ -414,9 +411,9 @@ public class TorrentClient implements AutoCloseable {
     // Utils
 
     private void store() throws IOException {
-        Path state = Paths.get(workingDir, STATE_FILE);
+        Path state = workingDir.resolve(STATE_FILE);
         if (!Files.exists(state)) {
-            Files.createDirectories(Paths.get(workingDir));
+            Files.createDirectories(workingDir);
             Files.createFile(state);
         }
         try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(state))) {
@@ -425,7 +422,7 @@ public class TorrentClient implements AutoCloseable {
     }
 
     private void load() throws IOException {
-        Path state = Paths.get(workingDir, STATE_FILE);
+        Path state = workingDir.resolve(STATE_FILE);
         if (Files.exists(state)) {
             try (DataInputStream dis = new DataInputStream(Files.newInputStream(state))) {
                 int size = dis.readInt();
