@@ -1,6 +1,11 @@
 #!/bin/sh
 
-REFERENCE_FILE=/home/user/work/software/ideaIC-145.844.1.tar.gz
+REFERENCE_FILE='/home/ldvsoft/Downloads/ideaIU-2016.1.1.tar.gz'
+
+if [ ! -f ] ; then
+	echo "File missing: ${REFERENCE_FILE}!"
+	exit 1
+fi
 
 PROJ=$PWD
 TMP=/tmp/torrent
@@ -25,6 +30,7 @@ CLIENT="$JAVA -cp $JAR ru.spbau.mit.TorrentClientMain"
 cd $TMP/server
 $SERVER & 
 PID0=$!
+echo "Server started (pid=${PID0})"
 
 cd $TMP/client1
 
