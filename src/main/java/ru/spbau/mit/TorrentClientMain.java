@@ -1,5 +1,7 @@
 package ru.spbau.mit;
 
+import ru.spbau.mit.TorrentRunningClient.RunCallbacks;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,7 +15,7 @@ public abstract class TorrentClientMain {
     private static final int ARG_ADDRESS = 1;
     private static final int ARG_1 = 2;
 
-    private static final TorrentClient.StatusCallbacks STATUS_CALLBACKS = new TorrentClient.StatusCallbacks() {
+    private static final RunCallbacks RUN_CALLBACKS = new RunCallbacks() {
         @Override
         public void onTrackerUpdated(boolean result, Throwable e) {
             if (result) {
@@ -74,7 +76,7 @@ public abstract class TorrentClientMain {
                 case "newfile":
                     doNewFile(args);
                     break;
-                case "run":
+                case "startRun":
                     doRun(args);
                     break;
                 default:
@@ -92,8 +94,9 @@ public abstract class TorrentClientMain {
             helpAndHalt();
         }
         String trackerAddress = args[ARG_ADDRESS];
-        try (TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""))) {
-            client.list().forEach(entry -> System.out.printf(
+        try (TorrentClientState state = new TorrentClientState(trackerAddress, Paths.get(""))) {
+            TorrentClient client = new TorrentClient(state);
+            client.requestList().forEach(entry -> System.out.printf(
                     "%d: %s (%d bytes).\n",
                     entry.getId(),
                     entry.getName(),
@@ -109,7 +112,8 @@ public abstract class TorrentClientMain {
         }
         String trackerAddress = args[ARG_ADDRESS];
         int id = Integer.decode(args[ARG_1]);
-        try (TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""))) {
+        try (TorrentClientState state = new TorrentClientState(trackerAddress, Paths.get(""))) {
+            TorrentClient client = new TorrentClient(state);
             if (client.get(id)) {
                 System.out.printf("New file added to download.\n");
             } else {
@@ -125,8 +129,8 @@ public abstract class TorrentClientMain {
         }
         String trackerAddress = args[ARG_ADDRESS];
         Path path = Paths.get(args[ARG_1]);
-        try (TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""))) {
-            client.setCallbacks(STATUS_CALLBACKS);
+        try (TorrentClientState state = new TorrentClientState(trackerAddress, Paths.get(""))) {
+            TorrentClient client = new TorrentClient(state);
             int newFileId = client.newFile(path).getId();
             System.out.printf("New file uploaded, id is %d.\n", newFileId);
         }
@@ -139,18 +143,10 @@ public abstract class TorrentClientMain {
         }
         String trackerAddress = args[ARG_ADDRESS];
         try {
-            TorrentClient client = new TorrentClient(trackerAddress, Paths.get(""));
-            client.setCallbacks(STATUS_CALLBACKS);
-            client.run();
+            TorrentClientState state = new TorrentClientState(trackerAddress, Paths.get(""));
+            TorrentRunningClient client = new TorrentRunningClient(state);
+            client.startRun(RUN_CALLBACKS);
 
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.printf("stopping....\n");
-                try {
-                    client.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -161,7 +157,7 @@ public abstract class TorrentClientMain {
         System.err.printf("\tlist <tracker-address>: get available files list from the tracker.\n");
         System.err.printf("\tget <tracker-address> <id>: mark file with given id for download.\n");
         System.err.printf("\tnewfile <tracker-address> <path>: upload new file to tracker.\n");
-        System.err.printf("\trun <tracker-address>: start working until interrupted.\n");
+        System.err.printf("\tstartRun <tracker-address>: start working until interrupted.\n");
 
         System.exit(1);
     }

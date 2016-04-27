@@ -11,8 +11,8 @@ import java.util.List;
  * Created by ldvsoft on 22.03.16.
  */
 public class ClientInfo {
-    private InetSocketAddress socketAddress;
-    private List<Integer> ids;
+    private final InetSocketAddress socketAddress;
+    private final List<Integer> ids;
 
     public ClientInfo(InetSocketAddress socketAddress, List<Integer> ids) {
         this.socketAddress = socketAddress;

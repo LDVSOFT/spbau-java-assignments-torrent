@@ -52,10 +52,19 @@ public class TorrentTracker implements AutoCloseable {
         store();
     }
 
+    private Socket accept() throws IOException {
+        try (LockHandler handler = LockHandler.lock(lock.readLock())) {
+            if (serverSocket.isClosed()) {
+                return null;
+            }
+        }
+        return serverSocket.accept();
+    }
+
     private void work() {
         while (true) {
             try {
-                Socket socket = serverSocket.accept();
+                Socket socket = accept();
                 if (socket == null) {
                     return;
                 }
@@ -118,7 +127,7 @@ public class TorrentTracker implements AutoCloseable {
         FileEntry newEntry = connection.readUploadRequest();
         try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
             int newId = files.size();
-            newEntry.setId(newId);
+            newEntry = newEntry.setId(newId);
             files.add(newEntry);
         }
         connection.writeUploadResponse(newEntry.getId());
@@ -132,9 +141,7 @@ public class TorrentTracker implements AutoCloseable {
         );
         try (LockHandler handler = LockHandler.lock(lock.writeLock())) {
             for (int id : clientInfo.getIds()) {
-                if (seeders.get(id) == null) {
-                    seeders.put(id, new HashSet<>());
-                }
+                seeders.putIfAbsent(id, new HashSet<>());
                 seeders.get(id).add(clientInfo);
             }
         }

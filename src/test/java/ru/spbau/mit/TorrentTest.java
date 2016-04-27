@@ -27,22 +27,25 @@ public class TorrentTest {
     public void testListAndUpload() throws Throwable {
         try (
                 TorrentTracker tracker = new TorrentTracker(TRACKER_DIR);
-                TorrentClient client1 = new TorrentClient("localhost", CLIENT1_DIR);
-                TorrentClient client2 = new TorrentClient("localhost", CLIENT2_DIR)
+                TorrentClientState clientState1 = new TorrentClientState("localhost", CLIENT1_DIR);
+                TorrentClientState clientState2 = new TorrentClientState("localhost", CLIENT2_DIR)
         ) {
-            assertAllCollectionEquals(Collections.emptyList(), client1.list(), client2.list());
+            TorrentClient client1 = new TorrentClient(clientState1);
+            TorrentClient client2 = new TorrentClient(clientState2);
+            assertAllCollectionEquals(Collections.emptyList(), client1.requestList(), client2.requestList());
 
             FileEntry entry1 = client1.newFile(EXAMPLE_PATH);
             FileEntry entry2 = client2.newFile(EXAMPLE_PATH);
             assertNotEquals("Should be different ids", entry1.getId(), entry2.getId());
 
-            assertAllCollectionEquals(Arrays.asList(entry1, entry2), client1.list(), client2.list());
+            assertAllCollectionEquals(Arrays.asList(entry1, entry2), client1.requestList(), client2.requestList());
         }
     }
 
     @Test
     public void testListConsistency() throws Throwable {
-        try (TorrentClient client = new TorrentClient("localhost", CLIENT1_DIR)) {
+        try (TorrentClientState clientState = new TorrentClientState("localhost", CLIENT1_DIR)) {
+            TorrentClient client = new TorrentClient(clientState);
             FileEntry entry;
             try (TorrentTracker tracker = new TorrentTracker(TRACKER_DIR)) {
                 entry = client.newFile(EXAMPLE_PATH);
@@ -50,7 +53,7 @@ public class TorrentTest {
 
             List<FileEntry> list;
             try (TorrentTracker tracker = new TorrentTracker(TRACKER_DIR)) {
-                list = client.list();
+                list = client.requestList();
             }
             assertEquals(Collections.singletonList(entry), list);
         }
@@ -63,38 +66,45 @@ public class TorrentTest {
         FileEntry entry;
         try (
                 TorrentTracker tracker = new TorrentTracker(TRACKER_DIR);
-                TorrentClient client2 = new TorrentClient("localhost", CLIENT2_DIR)
+                TorrentClientState clientState2 = new TorrentClientState("localhost", CLIENT2_DIR)
         ) {
-            client2.setCallbacks(waiter2);
-            try (TorrentClient client1 = new TorrentClient("localhost", CLIENT1_DIR)) {
+            TorrentClient client2 = new TorrentClient(clientState2);
+            TorrentRunningClient runningClient2 = new TorrentRunningClient(clientState2);
+            try (TorrentClientState clientState1 = new TorrentClientState("localhost", CLIENT1_DIR)) {
+                TorrentClient client1 = new TorrentClient(clientState1);
                 entry = client1.newFile(EXAMPLE_PATH);
                 assertTrue(client2.get(entry.getId()));
 
+                TorrentRunningClient runningClient1 = new TorrentRunningClient(clientState1);
                 // seeding
-                client1.run();
+                runningClient1.startRun(null);
                 // leeching
-                client2.run();
+                runningClient2.startRun(waiter2);
 
                 synchronized (waiter2) {
                     while (!waiter2.ready) {
                         waiter2.wait();
                     }
                 }
+                runningClient1.shutdown();
             }
 
             //Now client2 is seeding, testing that
-            try (TorrentClient client3 = new TorrentClient("localhost", CLIENT3_DIR)) {
-                client3.setCallbacks(waiter3);
+            try (TorrentClientState clientState3 = new TorrentClientState("localhost", CLIENT3_DIR)) {
+                TorrentClient client3 = new TorrentClient(clientState3);
                 assertTrue(client3.get(entry.getId()));
 
+                TorrentRunningClient runningClient3 = new TorrentRunningClient(clientState3);
                 //leeching
-                client3.run();
+                runningClient3.startRun(waiter3);
                 synchronized (waiter3) {
                     while (!waiter3.ready) {
                         waiter3.wait();
                     }
                 }
             }
+
+            runningClient2.shutdown();
         }
 
         Path downloadedPath = Paths.get(
@@ -147,7 +157,7 @@ public class TorrentTest {
         }
     }
 
-    private static final class DownloadWaiter implements TorrentClient.StatusCallbacks {
+    private static final class DownloadWaiter implements TorrentRunningClient.RunCallbacks {
         private boolean ready = false;
 
         private DownloadWaiter() {

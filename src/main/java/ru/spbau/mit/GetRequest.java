@@ -8,8 +8,8 @@ import java.io.IOException;
  * Created by ldvsoft on 22.03.16.
  */
 public class GetRequest {
-    private int fileId;
-    private int partId;
+    private final int fileId;
+    private final int partId;
 
     public GetRequest(int fileId, int partId) {
         this.fileId = fileId;

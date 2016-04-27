@@ -13,10 +13,10 @@ public final class FileEntry {
 
     private static final int HASH_BASE = 31;
 
-    private boolean hasId;
-    private int id;
-    private String name;
-    private long size;
+    private final boolean hasId;
+    private final int id;
+    private final String name;
+    private final long size;
 
     public FileEntry(int id, String name, long size) {
         this.hasId = true;
@@ -27,6 +27,7 @@ public final class FileEntry {
 
     public FileEntry(String name, long size) {
         this.hasId = false;
+        this.id = 0;
         this.name = name;
         this.size = size;
     }
@@ -47,9 +48,8 @@ public final class FileEntry {
         return size;
     }
 
-    public void setId(int id) {
-        this.hasId = true;
-        this.id = id;
+    public FileEntry setId(int id) {
+        return new FileEntry(id, name, size);
     }
 
     public void writeTo(DataOutputStream dos) throws IOException {
