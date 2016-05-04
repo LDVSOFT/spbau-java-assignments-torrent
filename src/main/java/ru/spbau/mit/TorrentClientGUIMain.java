@@ -188,6 +188,34 @@ public final class TorrentClientGUIMain {
         }
     };
 
+    private Action getFileAction = new AbstractAction() {
+        {
+            putValue(NAME, "Get file");
+            putValue(SHORT_DESCRIPTION, "Download new file from peers");
+            putValue(MNEMONIC_KEY, KeyEvent.VK_D);
+            putValue(ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_MASK));
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent event) {
+            try {
+                List<FileEntry> files = new TorrentClient(state).requestList();
+                try (LockHandler handler = LockHandler.lock(state.lock.readLock())) {
+                    for (TorrentClientState.FileState fileState : state.files.values()) {
+                        files.remove(fileState.entry);
+                    }
+                }
+                Integer result = new TorrentClientGUIListDialog(frame, files).showDialog();
+                if (result != null) {
+                    new TorrentClient(state).get(files.get(result).getId());
+                    fetchModel();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    };
+
     private Action startRunAction = new AbstractAction() {
         {
             putValue(NAME, "Start running");
@@ -200,7 +228,7 @@ public final class TorrentClientGUIMain {
         public void actionPerformed(ActionEvent event) {
             try {
                 runningClient = new TorrentRunningClient(state);
-                runningClient.startRun(null);
+                runningClient.startRun(callbacks);
 
                 setEnabled(false);
                 stopRunAction.setEnabled(true);
@@ -340,6 +368,7 @@ public final class TorrentClientGUIMain {
         {
             JMenu fileMenu = new JMenu("File");
             fileMenu.add(newFileAction);
+            fileMenu.add(getFileAction);
             fileMenu.addSeparator();
             fileMenu.add(changeTrackerAction);
             fileMenu.add(startRunAction);
