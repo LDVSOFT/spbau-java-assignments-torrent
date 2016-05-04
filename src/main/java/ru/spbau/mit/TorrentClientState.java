@@ -8,9 +8,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Created by ldvsoft on 26.04.16.
@@ -26,11 +29,25 @@ class TorrentClientState implements AutoCloseable {
     /*package*/ String host;
 
     /*package*/ TorrentClientState(String host, Path workingDir) throws IOException {
+        this(workingDir);
         this.host = host;
+    }
+
+    /*package*/ TorrentClientState(Path workingDir) throws IOException {
         this.workingDir = workingDir;
         load();
     }
 
+    public static void wipe(Path workingDir) {
+        Path state = workingDir.resolve(STATE_FILE);
+        if (Files.exists(state)) {
+            try {
+                Files.delete(state);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
     @Override
     public void close() throws IOException {
         store();
@@ -90,6 +107,7 @@ class TorrentClientState implements AutoCloseable {
             Files.createFile(state);
         }
         try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(state))) {
+            dos.writeUTF(host);
             IOUtils.writeCollection(files.values(), (dos1, o) -> o.writeTo(dos1), dos);
         }
     }
@@ -98,16 +116,17 @@ class TorrentClientState implements AutoCloseable {
         Path state = workingDir.resolve(STATE_FILE);
         if (Files.exists(state)) {
             try (DataInputStream dis = new DataInputStream(Files.newInputStream(state))) {
-                int size = dis.readInt();
-                files = new HashMap<>(size);
-                while (size > 0) {
-                    --size;
-                    FileState fs = FileState.readFrom(dis);
-                    files.put(fs.entry.getId(), fs);
-                }
+                host = dis.readUTF();
+                files = IOUtils.readCollection(new HashSet<>(), FileState::readFrom, dis)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                fileState -> fileState.entry.getId(),
+                                Function.identity()
+                        ));
             }
         } else {
             // Empty state
+            host = "";
             files = new HashMap<>();
         }
     }
