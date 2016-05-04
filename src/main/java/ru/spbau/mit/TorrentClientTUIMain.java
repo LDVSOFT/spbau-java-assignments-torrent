@@ -9,7 +9,7 @@ import java.nio.file.Paths;
 /**
  * Created by ldvsoft on 02.04.16.
  */
-public abstract class TorrentClientMain {
+public abstract class TorrentClientTUIMain {
 
     private static final int ARG_ACTION = 0;
     private static final int ARG_ADDRESS = 1;

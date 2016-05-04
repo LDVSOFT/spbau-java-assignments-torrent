@@ -25,7 +25,7 @@ mvn assembly:assembly
 
 JAR=$PROJ/target/torrent-1.0-SNAPSHOT-jar-with-dependencies.jar
 SERVER="$JAVA -cp $JAR ru.spbau.mit.TorrentTrackerMain"
-CLIENT="$JAVA -cp $JAR ru.spbau.mit.TorrentClientMain"
+CLIENT="$JAVA -cp $JAR ru.spbau.mit.TorrentClientTUIMain"
 
 cd $TMP/server
 $SERVER & 
