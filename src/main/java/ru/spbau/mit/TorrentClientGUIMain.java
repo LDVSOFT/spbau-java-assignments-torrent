@@ -27,6 +27,7 @@ public final class TorrentClientGUIMain {
     private enum Columns {
         ID,
         NAME,
+        LOCAL_PATH,
         SIZE,
         PROGRESS
     }
@@ -36,6 +37,7 @@ public final class TorrentClientGUIMain {
     static {
         COLUMNS_NAMES.put(Columns.ID, "File ID");
         COLUMNS_NAMES.put(Columns.NAME, "File name");
+        COLUMNS_NAMES.put(Columns.LOCAL_PATH, "Local path");
         COLUMNS_NAMES.put(Columns.SIZE, "File size");
         COLUMNS_NAMES.put(Columns.PROGRESS, "Progress");
     }
@@ -43,6 +45,7 @@ public final class TorrentClientGUIMain {
     private static class TableRow {
         private int id;
         private String name;
+        private String localPath;
         private String size;
         private double progress;
 
@@ -50,8 +53,9 @@ public final class TorrentClientGUIMain {
             try (LockHandler handler = LockHandler.lock(state.fileLock.readLock())) {
                 id = state.entry.getId();
                 name = state.entry.getName();
+                localPath = state.localPath.toString();
                 size = FileUtils.byteCountToDisplaySize(state.entry.getSize());
-                progress = state.parts.getCount() / state.entry.getPartsCount();
+                progress = (state.parts.getCount() + 0.0) / state.entry.getPartsCount();
             }
         }
     }
@@ -81,6 +85,8 @@ public final class TorrentClientGUIMain {
                     return data.get(rowIndex).id;
                 case NAME:
                     return data.get(rowIndex).name;
+                case LOCAL_PATH:
+                    return data.get(rowIndex).localPath;
                 case SIZE:
                     return data.get(rowIndex).size;
                 case PROGRESS:
@@ -95,6 +101,7 @@ public final class TorrentClientGUIMain {
                 case ID:
                     return Integer.TYPE;
                 case NAME:
+                case LOCAL_PATH:
                 case SIZE:
                     return String.class;
                 case PROGRESS:
@@ -133,6 +140,7 @@ public final class TorrentClientGUIMain {
 
     private JFileChooser fc = new JFileChooser();
     private TableModel model;
+    private JTextArea logArea;
     private TorrentClientState state;
     private TorrentRunningClient runningClient;
     private JFrame frame;
@@ -140,14 +148,25 @@ public final class TorrentClientGUIMain {
     private TorrentRunningClient.RunCallbacks callbacks = new TorrentRunningClient.RunCallbacks() {
         @Override
         public void onTrackerUpdated(boolean result, Throwable e) {
+            if (!result) {
+                writeMessage("Failed to update tracker: %s", e.getMessage());
+            }
         }
 
         @Override
         public void onDownloadIssue(FileEntry entry, String message, Throwable e) {
+            writeMessage(
+                    "File \"%s\" (#%d) download issue: %s (%s)",
+                    entry.getName(),
+                    entry.getId(),
+                    message,
+                    (e == null) ? "" : e.getMessage()
+            );
         }
 
         @Override
         public void onDownloadStart(FileEntry entry) {
+            writeMessage("File \"%s\" (#%d) download is starting...", entry.getName(), entry.getId());
         }
 
         @Override
@@ -157,10 +176,12 @@ public final class TorrentClientGUIMain {
 
         @Override
         public void onDownloadComplete(FileEntry entry) {
+            writeMessage("File \"%s\" (#%d) downloaded!", entry.getName(), entry.getId());
         }
 
         @Override
         public void onP2PServerIssue(Throwable e) {
+            writeMessage("Seeding server issue: %s", e.getMessage());
         }
     };
 
@@ -174,17 +195,18 @@ public final class TorrentClientGUIMain {
 
         @Override
         public void actionPerformed(ActionEvent event) {
-            int ret = fc.showOpenDialog(frame);
-            if (ret == JFileChooser.APPROVE_OPTION) {
-                Path p = fc.getSelectedFile().toPath();
-                try {
-                    new TorrentClient(state).newFile(p);
-                    fetchModel();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    showErrorDialog("Failed to upload file: " + e.getMessage());
+            SwingUtilities.invokeLater(() -> {
+                int ret = fc.showOpenDialog(frame);
+                if (ret == JFileChooser.APPROVE_OPTION) {
+                    Path p = fc.getSelectedFile().toPath();
+                    try {
+                        new TorrentClient(state).newFile(p);
+                        fetchModel();
+                    } catch (IOException e) {
+                        showErrorDialog("Failed to upload file: " + e.getMessage());
+                    }
                 }
-            }
+            });
         }
     };
 
@@ -198,21 +220,29 @@ public final class TorrentClientGUIMain {
 
         @Override
         public void actionPerformed(ActionEvent event) {
-            try {
-                List<FileEntry> files = new TorrentClient(state).requestList();
+            SwingUtilities.invokeLater(() -> {
+                List<FileEntry> files;
+                try {
+                    files = new TorrentClient(state).requestList();
+                } catch (IOException e) {
+                    showErrorDialog(String.format("Failed to get file list from tracker: %s\n", e.getMessage()));
+                    return;
+                }
                 try (LockHandler handler = LockHandler.lock(state.lock.readLock())) {
                     for (TorrentClientState.FileState fileState : state.files.values()) {
                         files.remove(fileState.entry);
                     }
                 }
                 Integer result = new TorrentClientGUIListDialog(frame, files).showDialog();
-                if (result != null) {
-                    new TorrentClient(state).get(files.get(result).getId());
-                    fetchModel();
+                try {
+                    if (result != null) {
+                        new TorrentClient(state).get(files.get(result).getId());
+                        fetchModel();
+                    }
+                } catch (IOException e) {
+                    showErrorDialog(String.format("Failed to add file to downloads list: %s\n", e.getMessage()));
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            });
         }
     };
 
@@ -230,9 +260,12 @@ public final class TorrentClientGUIMain {
                 runningClient = new TorrentRunningClient(state);
                 runningClient.startRun(callbacks);
 
+                writeMessage("Started running!");
                 setEnabled(false);
                 stopRunAction.setEnabled(true);
                 changeTrackerAction.setEnabled(false);
+                newFileAction.setEnabled(false);
+                getFileAction.setEnabled(false);
             } catch (IOException e) {
                 e.printStackTrace();
                 showErrorDialog("Failed to run client: " + e.getMessage());
@@ -253,9 +286,12 @@ public final class TorrentClientGUIMain {
         @Override
         public void actionPerformed(ActionEvent e) {
             runningClient.shutdown();
+            writeMessage("Stopped running!");
             setEnabled(false);
             startRunAction.setEnabled(true);
             changeTrackerAction.setEnabled(true);
+            newFileAction.setEnabled(true);
+            getFileAction.setEnabled(true);
         }
     };
 
@@ -319,14 +355,16 @@ public final class TorrentClientGUIMain {
     }
 
     private void fetchModel() {
-        List<TableRow> data;
-        try (LockHandler handler = LockHandler.lock(state.lock.readLock())) {
-            data = state.files.values()
-                    .stream()
-                    .map(TableRow::new)
-                    .collect(Collectors.toList());
-        }
-        model.setData(data);
+        SwingUtilities.invokeLater(() -> {
+            List<TableRow> data;
+            try (LockHandler handler = LockHandler.lock(state.lock.readLock())) {
+                data = state.files.values()
+                        .stream()
+                        .map(TableRow::new)
+                        .collect(Collectors.toList());
+            }
+            model.setData(data);
+        });
     }
 
     private void close() {
@@ -338,7 +376,7 @@ public final class TorrentClientGUIMain {
             try {
                 state.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                showErrorDialog("Failed to save state: " + e.getMessage());
             }
         }
         System.exit(0);
@@ -355,14 +393,24 @@ public final class TorrentClientGUIMain {
         });
 
         JTable table = new JTable(model);
-        JScrollPane scrollPane = new JScrollPane(table);
         table.setFillsViewportHeight(true);
         table.setRowSelectionAllowed(false);
         table.setColumnSelectionAllowed(false);
         table.setCellSelectionEnabled(false);
+        table.getColumn(COLUMNS_NAMES.get(Columns.ID)).setMinWidth(50);
         table.getColumn(COLUMNS_NAMES.get(Columns.ID)).setMaxWidth(75);
         table.getColumn(COLUMNS_NAMES.get(Columns.NAME)).setMinWidth(200);
+        table.getColumn(COLUMNS_NAMES.get(Columns.NAME)).setMaxWidth(400);
+        table.getColumn(COLUMNS_NAMES.get(Columns.LOCAL_PATH)).setMinWidth(200);
+        table.getColumn(COLUMNS_NAMES.get(Columns.SIZE)).setMinWidth(50);
+        table.getColumn(COLUMNS_NAMES.get(Columns.SIZE)).setMaxWidth(75);
+        table.getColumn(COLUMNS_NAMES.get(Columns.PROGRESS)).setMinWidth(50);
+        table.getColumn(COLUMNS_NAMES.get(Columns.PROGRESS)).setMaxWidth(150);
         table.getColumn(COLUMNS_NAMES.get(Columns.PROGRESS)).setCellRenderer(new ProgressRenderer());
+
+        logArea = new JTextArea();
+        logArea.setEditable(false);
+        logArea.setMinimumSize(new Dimension(200, 100));
 
         JMenuBar menuBar = new JMenuBar();
         {
@@ -379,9 +427,11 @@ public final class TorrentClientGUIMain {
         }
 
         SwingUtilities.invokeLater(() -> {
-            frame.setSize(600, 400);
+            frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.PAGE_AXIS));
             frame.setJMenuBar(menuBar);
-            frame.add(scrollPane);
+            frame.add(new JScrollPane(table));
+            frame.add(new JScrollPane(logArea));
+            frame.setMinimumSize(new Dimension(700, 600));
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
@@ -390,5 +440,10 @@ public final class TorrentClientGUIMain {
 
     private void showErrorDialog(String message) {
         JOptionPane.showMessageDialog(frame, message, "Error", JOptionPane.ERROR_MESSAGE);
+        writeMessage("Error: " + message);
+    }
+
+    private void writeMessage(String format, Object... args) {
+        SwingUtilities.invokeLater(() -> logArea.append(String.format(format + "\n", args)));
     }
 }
