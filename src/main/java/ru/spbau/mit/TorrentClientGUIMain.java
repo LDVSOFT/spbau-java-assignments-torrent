@@ -20,10 +20,7 @@ import java.util.stream.Collectors;
  * Created by ldvsoft on 04.05.16.
  */
 public final class TorrentClientGUIMain {
-    public static void main(String[] args) {
-        new TorrentClientGUIMain();
-    }
-
+    // CHECKSTYLE.OFF: MagicNumber
     private enum Columns {
         ID,
         NAME,
@@ -42,7 +39,7 @@ public final class TorrentClientGUIMain {
         COLUMNS_NAMES.put(Columns.PROGRESS, "Progress");
     }
 
-    private static class TableRow {
+    private static final class TableRow {
         private int id;
         private String name;
         private String localPath;
@@ -60,7 +57,7 @@ public final class TorrentClientGUIMain {
         }
     }
 
-    private static class TableModel extends AbstractTableModel {
+    private static final class TableModel extends AbstractTableModel {
         private volatile List<TableRow> data = Collections.emptyList();
 
         @Override
@@ -116,7 +113,7 @@ public final class TorrentClientGUIMain {
         }
     }
 
-    private static class ProgressRenderer implements TableCellRenderer {
+    private static final class ProgressRenderer implements TableCellRenderer {
         private static final int SCALE = 1000;
 
         private JProgressBar bar = new JProgressBar(0, SCALE);
@@ -133,7 +130,7 @@ public final class TorrentClientGUIMain {
                 boolean isSelected, boolean hasFocus,
                 int row, int column
         ) {
-            bar.setValue((int)((double)value * SCALE));
+            bar.setValue((int) ((double) value * SCALE));
             return bar;
         }
     }
@@ -145,7 +142,7 @@ public final class TorrentClientGUIMain {
     private TorrentRunningClient runningClient;
     private JFrame frame;
 
-    private TorrentRunningClient.RunCallbacks callbacks = new TorrentRunningClient.RunCallbacks() {
+    private final TorrentRunningClient.RunCallbacks callbacks = new TorrentRunningClient.RunCallbacks() {
         @Override
         public void onTrackerUpdated(boolean result, Throwable e) {
             if (!result) {
@@ -185,7 +182,7 @@ public final class TorrentClientGUIMain {
         }
     };
 
-    private Action newFileAction = new AbstractAction() {
+    private final Action newFileAction = new AbstractAction() {
         {
             putValue(NAME, "New file");
             putValue(SHORT_DESCRIPTION, "Upload new file to tracker");
@@ -210,7 +207,7 @@ public final class TorrentClientGUIMain {
         }
     };
 
-    private Action getFileAction = new AbstractAction() {
+    private final Action getFileAction = new AbstractAction() {
         {
             putValue(NAME, "Get file");
             putValue(SHORT_DESCRIPTION, "Download new file from peers");
@@ -246,7 +243,7 @@ public final class TorrentClientGUIMain {
         }
     };
 
-    private Action startRunAction = new AbstractAction() {
+    private final Action startRunAction = new AbstractAction() {
         {
             putValue(NAME, "Start running");
             putValue(SHORT_DESCRIPTION, "Start seeding and downloading files");
@@ -274,7 +271,7 @@ public final class TorrentClientGUIMain {
         }
     };
 
-    private Action stopRunAction = new AbstractAction() {
+    private final Action stopRunAction = new AbstractAction() {
         {
             putValue(NAME, "Stop running");
             putValue(SHORT_DESCRIPTION, "Stop seeding and downloading files");
@@ -295,7 +292,7 @@ public final class TorrentClientGUIMain {
         }
     };
 
-    private Action changeTrackerAction = new AbstractAction() {
+    private final Action changeTrackerAction = new AbstractAction() {
         {
             putValue(NAME, "Change tracker");
             putValue(SHORT_DESCRIPTION, "Change tracker address");
@@ -326,7 +323,7 @@ public final class TorrentClientGUIMain {
         }
     };
 
-    private Action closeAction = new AbstractAction() {
+    private final Action closeAction = new AbstractAction() {
         {
             putValue(NAME, "Close");
             putValue(SHORT_DESCRIPTION, "Exit application");
@@ -340,7 +337,7 @@ public final class TorrentClientGUIMain {
         }
     };
 
-    private TorrentClientGUIMain () {
+    private TorrentClientGUIMain() {
         model = new TableModel();
         buildUI();
         try {
@@ -352,6 +349,10 @@ public final class TorrentClientGUIMain {
             TorrentClientState.wipe(Paths.get(""));
             close();
         }
+    }
+
+    public static void main(String[] args) {
+        new TorrentClientGUIMain();
     }
 
     private void fetchModel() {

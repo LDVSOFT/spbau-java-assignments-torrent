@@ -16,6 +16,7 @@ import java.util.Map;
  * Created by ldvsoft on 04.05.16.
  */
 public class TorrentClientGUIListDialog extends JDialog {
+    // CHECKSTYLE.OFF: MagicNumber
     private enum Columns {
         ID,
         NAME,
@@ -30,7 +31,7 @@ public class TorrentClientGUIListDialog extends JDialog {
         COLUMNS_NAMES.put(Columns.SIZE, "File size");
     }
 
-    private static class TableModel extends AbstractTableModel {
+    private static final class TableModel extends AbstractTableModel {
         private volatile List<FileEntry> data;
 
         private TableModel(List<FileEntry> data) {
