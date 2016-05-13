@@ -76,7 +76,7 @@ public abstract class TorrentClientTUIMain {
                 case "newfile":
                     doNewFile(args);
                     break;
-                case "startRun":
+                case "run":
                     doRun(args);
                     break;
                 default:
@@ -157,7 +157,7 @@ public abstract class TorrentClientTUIMain {
         System.err.printf("\tlist <tracker-address>: get available files list from the tracker.\n");
         System.err.printf("\tget <tracker-address> <id>: mark file with given id for download.\n");
         System.err.printf("\tnewfile <tracker-address> <path>: upload new file to tracker.\n");
-        System.err.printf("\tstartRun <tracker-address>: start working until interrupted.\n");
+        System.err.printf("\trun <tracker-address>: start working until interrupted.\n");
 
         System.exit(1);
     }
